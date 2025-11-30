@@ -27,11 +27,12 @@ class ImageData:
 
 @dataclass
 class ErrorPoint:
-    """粗差点信息，误差值单位为σ。"""
+    """粗差点信息，包含像平面粗差值（mm）及其相对中误差倍数。"""
 
     point_id: int
-    error_sigma: float
-    error_abs_sigma: float
+    error_mm: float
+    rel_sigma: float
+    rel_abs_sigma: float
 
 
 def read_inner_params(ioe_path: Path) -> InnerParams:
@@ -218,11 +219,19 @@ class LpvsDetector:
             N2 = (Bx * Z1 - Bz * X1) / denom
 
             dy = (N1 * Y1 - By) / N2 - Y2
-            err_sigma = dy / self.m0
-            err_abs = abs(err_sigma)
+            err_mm = dy
+            rel_sigma = err_mm / self.m0
+            rel_abs_sigma = abs(rel_sigma)
 
-            if 4 <= err_abs <= 100:
-                errors.append(ErrorPoint(point_id=pid, error_sigma=err_sigma, error_abs_sigma=err_abs))
+            if 4 <= rel_abs_sigma <= 100:
+                errors.append(
+                    ErrorPoint(
+                        point_id=pid,
+                        error_mm=err_mm,
+                        rel_sigma=rel_sigma,
+                        rel_abs_sigma=rel_abs_sigma,
+                    )
+                )
 
         errors.sort(key=lambda e: e.point_id)
 
@@ -237,10 +246,10 @@ class LpvsDetector:
 
 def fmt_errors(label: str, errors: Iterable[ErrorPoint]) -> List[str]:
     """将粗差结果格式化为文本行，便于统一输出。"""
-    lines = [f"影像对 {label} 粗差点（4-100σ）："]
-    lines.append("PointID\t误差(σ)\t绝对值(σ)")
+    lines = [f"影像对 {label} 粗差点（4-100σ，输出单位 mm 及倍数）："]
+    lines.append("PointID\t粗差值(mm)\t相对中误差倍数")
     for ep in errors:
-        lines.append(f"{ep.point_id}\t{ep.error_sigma:.6f}\t{ep.error_abs_sigma:.6f}")
+        lines.append(f"{ep.point_id}\t{ep.error_mm:.6f}\t{ep.rel_abs_sigma:.6f}")
     if len(lines) == 2:
         lines.append("无粗差点满足筛选条件。")
     return lines
